@@ -57,41 +57,12 @@ resource "aws_eks_cluster" "this" {
     bootstrap_cluster_creator_admin_permissions = false
   }
 
-  dynamic "compute_config" {
-    for_each = [var.compute_config]
-
-    content {
-      enabled       = compute_config.value.enabled
-      node_pools    = compute_config.value.node_pools
-      node_role_arn = compute_config.value.node_pools != null ? try(aws_iam_role.eks_auto[0].arn, compute_config.value.node_role_arn) : null
-    }
-  }
-
   vpc_config {
     security_group_ids      = compact(distinct(concat(var.additional_security_group_ids, [local.security_group_id])))
     subnet_ids              = coalescelist(var.control_plane_subnet_ids, var.subnet_ids)
     endpoint_private_access = var.endpoint_private_access
     endpoint_public_access  = var.endpoint_public_access
     public_access_cidrs     = var.endpoint_public_access_cidrs
-  }
-
-  dynamic "kubernetes_network_config" {
-    # Not valid on Outposts
-    for_each = local.create_outposts_local_cluster ? [] : [1]
-
-    content {
-      dynamic "elastic_load_balancing" {
-        for_each = [var.compute_config]
-
-        content {
-          enabled = elastic_load_balancing.value.enabled
-        }
-      }
-
-      ip_family         = var.ip_family
-      service_ipv4_cidr = var.service_ipv4_cidr
-      service_ipv6_cidr = var.service_ipv6_cidr
-    }
   }
 
   dynamic "outpost_config" {
@@ -143,16 +114,6 @@ resource "aws_eks_cluster" "this" {
         content {
           cidrs = remote_pod_networks.value.cidrs
         }
-      }
-    }
-  }
-
-  dynamic "storage_config" {
-    for_each = [var.compute_config]
-
-    content {
-      block_storage {
-        enabled = storage_config.value.enabled
       }
     }
   }
